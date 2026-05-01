@@ -140,6 +140,12 @@ cd "$REPO_ROOT"
 bash scripts/install-standard-layout.sh
 ```
 
+To copy **only** the operator scripts and PATH wrappers (no config redeploy), after you already have config under `~/.config/cursor-ollama-gateway/`:
+
+```bash
+bash scripts/install-to-home.sh
+```
+
 System-wide:
 
 ```bash
@@ -228,10 +234,17 @@ curl -sS https://<your-ngrok-domain>/v1/models \
 
 ## Cursor configuration
 
-- Provider type: OpenAI-compatible
-- Base URL: `https://<your-ngrok-domain>/v1`
-- API key: value of `OLLAMA_PROXY_TOKEN`
-- Model: a model available in Ollama (e.g. `llama3.1:8b`)
+In Cursor, add an **OpenAI-compatible** (or **OpenAI API**) provider that talks to your gateway—not to OpenAI’s servers.
+
+- **Provider type:** OpenAI-compatible
+- **Base URL:** `https://<your-ngrok-domain>/v1`
+- **API key:** paste the **`OLLAMA_PROXY_TOKEN`** value from your gateway `.env`  
+  (typically `~/.config/cursor-ollama-gateway/.env`, or under `$XDG_CONFIG_HOME` if set).  
+  Caddy checks this as the `Bearer` token; it is **only** your local gateway secret.
+
+**Do not** put **`NGROK_AUTHTOKEN`** or a real **OpenAI API key** in Cursor for this setup. Ngrok’s token stays in `.env` for the ngrok process only.
+
+- **Model:** an Ollama model id (e.g. `llama3.1:8b`)
 
 ## Token rotation
 
