@@ -1,8 +1,9 @@
+# Authentication: set NGROK_AUTHTOKEN in ~/.config/cursor-ollama-gateway/.env — start-stack.sh exports it.
+# Do not put `${NGROK_AUTHTOKEN}` here; ngrok does not expand shell syntax and will reject it (ERR_NGROK_105).
 version: "2"
-authtoken: ${NGROK_AUTHTOKEN}
 
 tunnels:
   cursor-ollama:
     proto: http
-    addr: https://127.0.0.1:8443
+    addr: http://127.0.0.1:8443
     inspect: false

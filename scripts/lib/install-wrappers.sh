@@ -23,6 +23,33 @@ EOF
 	rm -f "$tmp"
 }
 
+# Bash exits 0 on an empty file — wrappers must refuse that so PATH commands never fail silently.
+_write_cursor_ollama_gateway_main_wrapper() {
+	local maybe_sudo="$1"
+	local dest="$2"
+	local script_root="$3"
+	local tmp
+	tmp="$(mktemp)"
+	cat >"$tmp" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+GATEWAY="$script_root/cursor-ollama-gateway.sh"
+if [[ ! -s "\$GATEWAY" ]]; then
+	echo "cursor-ollama-gateway: missing or empty script: \$GATEWAY" >&2
+	echo "Refresh installed scripts from your clone:" >&2
+	echo "  bash /path/to/cursor-ollama-gateway/scripts/install-to-home.sh" >&2
+	exit 1
+fi
+exec bash "\$GATEWAY" "\$@"
+EOF
+	if [[ -n "$maybe_sudo" ]]; then
+		sudo install -m 0755 "$tmp" "$dest"
+	else
+		install -m 0755 "$tmp" "$dest"
+	fi
+	rm -f "$tmp"
+}
+
 _write_cursor_ollama_gateway_invoker() {
 	local maybe_sudo="$1"
 	local dest="$2"
@@ -33,7 +60,14 @@ _write_cursor_ollama_gateway_invoker() {
 	cat >"$tmp" <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
-exec bash "$script_root/cursor-ollama-gateway.sh" $subcommand "\$@"
+GATEWAY="$script_root/cursor-ollama-gateway.sh"
+if [[ ! -s "\$GATEWAY" ]]; then
+	echo "cursor-ollama-gateway: missing or empty script: \$GATEWAY" >&2
+	echo "Refresh installed scripts from your clone:" >&2
+	echo "  bash /path/to/cursor-ollama-gateway/scripts/install-to-home.sh" >&2
+	exit 1
+fi
+exec bash "\$GATEWAY" $subcommand "\$@"
 EOF
 	if [[ -n "$maybe_sudo" ]]; then
 		sudo install -m 0755 "$tmp" "$dest"
@@ -54,7 +88,7 @@ install_cursor_ollama_gateway_wrappers() {
 		mkdir -p "$wrapper_bin"
 	fi
 
-	_write_gateway_wrapper "$maybe_sudo" "$wrapper_bin/cursor-ollama-gateway" "$script_root/cursor-ollama-gateway.sh"
+	_write_cursor_ollama_gateway_main_wrapper "$maybe_sudo" "$wrapper_bin/cursor-ollama-gateway" "$script_root"
 	_write_cursor_ollama_gateway_invoker "$maybe_sudo" "$wrapper_bin/cursor-ollama-start" "$script_root" start
 	_write_cursor_ollama_gateway_invoker "$maybe_sudo" "$wrapper_bin/cursor-ollama-stop" "$script_root" stop
 	_write_cursor_ollama_gateway_invoker "$maybe_sudo" "$wrapper_bin/cursor-ollama-status" "$script_root" status

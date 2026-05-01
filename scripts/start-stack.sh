@@ -26,9 +26,23 @@ if [[ ! -f "$NGROK_CONFIG" ]]; then
 	exit 1
 fi
 
+if grep -qE '^[[:space:]]*authtoken:[[:space:]].*\$\{NGROK_AUTHTOKEN\}' "$NGROK_CONFIG" 2>/dev/null; then
+	echo "ERROR: $NGROK_CONFIG lists authtoken: \${NGROK_AUTHTOKEN} — ngrok does not expand shell syntax (ERR_NGROK_105)." >&2
+	echo "Remove the entire authtoken: line. Put your real token only in NGROK_AUTHTOKEN=... inside $ENV_FILE" >&2
+	echo "Or copy ngrok.yml from this repo (no authtoken key)." >&2
+	exit 1
+fi
+
+# Save PATH before sourcing .env — `set -a` exports every assignment in .env. If .env sets PATH to
+# something narrow or empty, `command -v caddy` / `ngrok` inside spawned jobs becomes empty →
+# `exec: : not found`. Always put Homebrew prefixes back on PATH afterward.
+_gw_saved_path="$PATH"
 set -a
 source "$ENV_FILE"
 set +a
+PATH="${PATH:-$_gw_saved_path}"
+export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+unset _gw_saved_path
 
 start_proc() {
 	local name="$1"
@@ -60,7 +74,9 @@ start_proc() {
 		echo "$name: removed stale pid file before start"
 	fi
 
-	nohup /bin/zsh -lc "$cmd" >>"$out_file" 2>>"$err_file" &
+	# bash -c inherits this script's exported env + PATH (from ~/.env via set -a).
+	# zsh -lc often diverges from non-login bash PATH and can miss Homebrew binaries.
+	nohup bash -c "$cmd" >>"$out_file" 2>>"$err_file" &
 	local launcher_pid=$!
 
 	sleep 1
@@ -86,6 +102,10 @@ start_proc() {
 
 	echo "$launcher_pid" >"$pid_file"
 	echo "WARNING: $name exited immediately (launcher pid $launcher_pid). See $err_file" >&2
+	if [[ -s "$err_file" ]]; then
+		echo "Last lines from $(basename "$err_file"):" >&2
+		tail -n 20 "$err_file" | sed 's/^/  /' >&2
+	fi
 	return 0
 }
 

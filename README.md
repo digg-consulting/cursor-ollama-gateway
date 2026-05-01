@@ -2,7 +2,14 @@
 
 Production-ready local gateway to connect Cursor to Ollama through ngrok, with Caddy enforcing auth and path restrictions.
 
-Having problems (invalid model name, auth, ngrok)? See **[TROUBLESHOOTING.md](./TROUBLESHOOTING.md)**.
+## Documentation
+
+Extra guides live under **[docs/](docs/)**. Highlights:
+
+- **[Components](docs/COMPONENTS.md)** — plain-language intro to Cursor, Ollama, ngrok, Caddy (read first if you’re new)
+- **[Troubleshooting](docs/TROUBLESHOOTING.md)** — model names, auth, ngrok, brew conflicts
+- **[Contributing](docs/CONTRIBUTING.md)**
+- **[Security](docs/SECURITY.md)** — vulnerability reporting
 
 ## Architecture
 
@@ -18,7 +25,7 @@ By default everything stays under your home directory so each user has an isolat
 | PID files | `${XDG_STATE_HOME:-$HOME/.local/state}/cursor-ollama-gateway/run/` |
 | Logs (`start-stack.sh` **and** optional launchd) | `${XDG_DATA_HOME:-$HOME/.local/share}/cursor-ollama-gateway/logs/` |
 | Operator scripts (`paths.sh`, stack scripts, `generate-secrets`) | `${XDG_DATA_HOME:-$HOME/.local/share}/cursor-ollama-gateway/scripts/` |
-| PATH wrappers (quick deploy / `install-standard-layout`) | `~/.local/bin/` → **`cursor-ollama-gateway`** (`start` \| `stop` \| `status` \| `restart`), shortcuts **`cursor-ollama-start`** / **`cursor-ollama-stop`** / **`cursor-ollama-status`**, plus **`cursor-ollama-generate-secrets`** |
+| PATH wrappers (quick deploy / `install-standard-layout`) | `~/.local/bin/` → **`cursor-ollama-gateway`** (`start` \| `stop` \| `status` \| `restart` \| **`logs-clear`**), shortcuts **`cursor-ollama-start`** / **`cursor-ollama-stop`** / **`cursor-ollama-status`**, plus **`cursor-ollama-generate-secrets`** |
 
 Optional overrides:
 
@@ -51,7 +58,7 @@ For **`CURSOR_OLLAMA_GATEWAY_SYSTEM=1`**, logs default to `/usr/local/var/log/cu
 ## Why this is secure
 
 - Ollama is bound to `127.0.0.1` only.
-- Caddy is bound to `127.0.0.1` only.
+- Caddy listens on **`127.0.0.1` only** (HTTP to the tunnel agent; HTTPS to the world is terminated at **ngrok**).
 - ngrok is the only internet-facing entrypoint.
 - Caddy requires a bearer token and only allows `/v1/*`.
 - Unneeded paths and methods are denied.
@@ -89,6 +96,8 @@ brew install caddy ngrok
 NGROK_AUTHTOKEN=YOUR_NGROK_AUTHTOKEN
 ```
 
+The **`ngrok.yml`** shipped with this project does **not** embed the token (ngrok reads **`NGROK_AUTHTOKEN`** from the environment after **`start-stack.sh`** sources **`.env`**). Never put a literal **`${NGROK_AUTHTOKEN}`** string in **`ngrok.yml`** — ngrok does not expand shell syntax and will fail with **ERR_NGROK_105**.
+
 Optional but recommended for stable endpoint URLs:
 
 5. Reserve a domain/subdomain in ngrok dashboard.
@@ -114,7 +123,7 @@ It also **downloads** the same operator scripts as this repo into `~/.local/shar
 
 Commands available globally:
 
-- **`cursor-ollama-gateway <start|stop|status|restart>`** — single entrypoint (like an init script); **`start`** refuses to run while **`brew services`** has **ollama** marked started unless **`CURSOR_OLLAMA_GATEWAY_ALLOW_BREW_OLLAMA=1`** (stop **`brew services stop ollama`** first so this stack owns **`ollama serve`**).
+- **`cursor-ollama-gateway <start|stop|status|restart|logs-clear>`** — single entrypoint (like an init script); **`start`** refuses to run while **`brew services`** has **ollama** marked started unless **`CURSOR_OLLAMA_GATEWAY_ALLOW_BREW_OLLAMA=1`** (stop **`brew services stop ollama`** first so this stack owns **`ollama serve`**). **`logs-clear`** deletes **`*.log`** under **`LOG_DIR`** (see paths table).
 - **`cursor-ollama-start`**, **`cursor-ollama-stop`**, **`cursor-ollama-status`** — thin wrappers that call **`cursor-ollama-gateway`** with the matching subcommand.
 - **`cursor-ollama-generate-secrets`**
 
@@ -168,6 +177,8 @@ CFG="${XDG_CONFIG_HOME:-$HOME/.config}/cursor-ollama-gateway"
 caddy validate --config "$CFG/Caddyfile"
 ```
 
+If **`zsh: command not found: caddy`**, Homebrew’s bin dir is probably not on **`PATH`** in that terminal (common in Cursor’s integrated terminal until **`brew`** is wired into **`~/.zprofile`**). Either load Homebrew into the shell (`eval "$(/opt/homebrew/bin/brew shellenv)"` on Apple Silicon, or **`eval "$(/usr/local/bin/brew shellenv)"`** on Intel), open a new terminal after fixing **`~/.zprofile`**, or call **`caddy`** by full path — **`/opt/homebrew/bin/caddy`** or **`/usr/local/bin/caddy`** — before **`validate`**.
+
 Scripts are intentionally **not** marked executable in git; invoke with `bash scripts/...`, or use **quick deploy** / **`install-standard-layout`** so copy-on-disk wrappers (`cursor-ollama-*`) exist under `~/.local/bin`.
 
 ## Startup scripts (no plist required)
@@ -175,7 +186,7 @@ Scripts are intentionally **not** marked executable in git; invoke with `bash sc
 Preferred control path (runs **`brew services`** guard on **`start`**):
 
 ```bash
-bash scripts/cursor-ollama-gateway.sh start   # stop | status | restart
+bash scripts/cursor-ollama-gateway.sh start   # stop | status | restart | logs-clear
 # or, after quick deploy / install-standard-layout:
 cursor-ollama-gateway start
 cursor-ollama-start    # same as: cursor-ollama-gateway start
@@ -190,6 +201,12 @@ bash scripts/stop-stack.sh
 ```
 
 PID files and process logs use `RUN_DIR` / `LOG_DIR` from `scripts/lib/paths.sh`.
+
+To wipe rotated/stack logs under **`LOG_DIR`** (does not stop services):
+
+```bash
+cursor-ollama-gateway logs-clear
+```
 
 ## Optional: login startup without plist
 

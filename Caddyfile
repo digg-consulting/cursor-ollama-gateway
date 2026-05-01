@@ -1,16 +1,11 @@
 {
 	admin off
 	auto_https off
-	servers {
-		read_timeout 15s
-		write_timeout 120s
-		idle_timeout 120s
-	}
 }
 
+# Plain HTTP on loopback — TLS terminates at the ngrok edge. (Avoids ngrok failing to
+# verify Caddy's internal / self-signed cert when addr was https://127.0.0.1:8443.)
 127.0.0.1:8443 {
-	tls internal
-
 	request_body {
 		max_size 10MB
 	}

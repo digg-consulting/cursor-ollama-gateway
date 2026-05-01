@@ -63,6 +63,36 @@ Library names change over time. If `qwen3:14b` is invalid for **your** install, 
 
 ---
 
+## Caddy or ngrok exits immediately (WARNING in `start-stack.sh`)
+
+Check the files it names (**`caddy-ollama.err.log`**, **`ngrok-ollama.err.log`**).
+
+Common causes:
+
+1. **`command not found`** for **`caddy`** or **`ngrok`** — often a **PATH** mismatch when the stack used a different login shell. Current **`start-stack.sh`** launches services with **`bash -c`** so they inherit the same environment as the script; refresh **`scripts/start-stack.sh`** via **`install-to-home.sh`** / **`deploy.sh`**.
+
+2. **Ngrok → Caddy TLS verification** — older templates pointed **`ngrok.yml`** at **`https://127.0.0.1:8443`** while **`Caddyfile`** used **`tls internal`** (self-signed). The ngrok agent often refuses that backend certificate and exits. **Current templates use plain HTTP on loopback** (**no `tls internal`** in **`Caddyfile`**, **`addr: http://127.0.0.1:8443`** in **`ngrok.yml`**). Copy those changes into **`~/.config/cursor-ollama-gateway/`** (or merge by hand), then **`cursor-ollama-gateway restart`**.
+
+3. Invalid **`Caddyfile`** / **`ngrok.yml`** — run **`caddy validate --config "$CFG/Caddyfile"`** with **`CFG`** set to your config directory.
+
+4. **`Error: adapting config ... unrecognized servers option 'read_timeout'`** — your **`caddy`** build is older than the directive set we used briefly in templates. Copy the current **[`Caddyfile`](../Caddyfile)** from this repo (global block should only include **`admin`** / **`auto_https`**), or **`brew upgrade caddy`**.
+
+5. **`bash: line 0: exec: : not found`** in **`caddy-ollama.err.log`** — **`PATH`** exported from **`~/.config/cursor-ollama-gateway/.env`** overwrote or emptied **`PATH`**, so **`command -v caddy`** returned nothing inside the stack subprocess. Current **`start-stack.sh`** prepends **`/opt/homebrew/bin`** and **`/usr/local/bin`** after sourcing **`.env`**; refresh scripts via **`install-to-home.sh`**. Prefer **not** setting **`PATH`** in **`.env`** unless you mean to.
+
+6. **`ERR_NGROK_105`** / **`Your authtoken: ${NGROK_AUTHTOKEN}`** — **`ngrok.yml`** contained **`authtoken: ${NGROK_AUTHTOKEN}`**. Ngrok does **not** expand shell syntax. Put your real token only in **`NGROK_AUTHTOKEN=…`** in **`~/.config/cursor-ollama-gateway/.env`**, delete any **`authtoken:`** line from **`ngrok.yml`** (or copy **[`ngrok.yml`](../ngrok.yml)** from this repo), then **`cursor-ollama-gateway restart`**. Current **`start-stack.sh`** refuses **`start`** if **`ngrok.yml`** still contains that placeholder **`authtoken:`** line.
+
+---
+
+## Clearing old stack logs
+
+```bash
+cursor-ollama-gateway logs-clear
+```
+
+Removes **`*.log`** (and **`*.log.*`**) directly under **`LOG_DIR`** (default **`~/.local/share/cursor-ollama-gateway/logs/`**). Stop or restart the stack first if you want a perfectly quiet startup log after clearing.
+
+---
+
 ## Empty model list or Ollama errors behind the gateway
 
 - Verify **Ollama** is up: `curl -sS http://127.0.0.1:11434/api/tags`.
@@ -123,6 +153,66 @@ Common causes:
 5. **Stale scripts**: older `stop-stack.sh` only trusted pid files. Current scripts kill listeners found via **`lsof` / pgrep**, run a short **SIGKILL sweep** if needed, then warn if something **still** binds the port.
 
 After stop you should see either silence or a **WARNING** block naming what is still bound.
+
+---
+
+## `command not found: caddy` (or `ngrok`, `ollama`)
+
+Those binaries usually come from **Homebrew**. If **`PATH`** does not include Brew’s prefix, interactive **`zsh`** (including Cursor’s terminal) won’t find them.
+
+**Apple Silicon:** Homebrew lives under **`/opt/homebrew/bin`**. One-session fix:
+
+```bash
+eval "$(/opt/homebrew/bin/brew shellenv)"
+```
+
+**Intel Mac:** often **`/usr/local/bin`**:
+
+```bash
+eval "$(/usr/local/bin/brew shellenv)"
+```
+
+Then **`hash -r`** (optional) and retry **`caddy validate …`**.
+
+Permanent fix: ensure **`brew shellenv`** runs from **`~/.zprofile`** (Homebrew prints exact lines when you run **`brew shellenv`** once).
+
+You can always bypass **`PATH`**:
+
+```bash
+/opt/homebrew/bin/caddy validate --config ~/.config/cursor-ollama-gateway/Caddyfile
+# or
+/usr/local/bin/caddy validate --config ~/.config/cursor-ollama-gateway/Caddyfile
+```
+
+---
+
+## PATH commands finish instantly with **no output** (no processes started)
+
+**What’s going on:** the launcher runs `bash` on **`cursor-ollama-gateway.sh`** under **`~/.local/share/cursor-ollama-gateway/scripts/`**. If that file is **missing or zero-byte**, Bash exits successfully and prints nothing — so **`cursor-ollama-start`** and **`cursor-ollama-status`** both look like no-ops.
+
+**Check:**
+
+```bash
+wc -l ~/.local/share/cursor-ollama-gateway/scripts/cursor-ollama-gateway.sh
+type cursor-ollama-start
+head -5 ~/.local/bin/cursor-ollama-start
+```
+
+You should see a non-zero line count and a wrapper that references **`cursor-ollama-gateway.sh`**.
+
+**Fix:** refresh installed scripts from this repo (adjust path to your clone):
+
+```bash
+bash /path/to/cursor-ollama-gateway/scripts/install-to-home.sh
+```
+
+Then open a new terminal and try **`cursor-ollama-gateway start`** again.
+
+---
+
+## Only **`cursor-ollama-gateway: start → …`** (or **`status → …`**) then the shell prompt — no stack output
+
+Fixed in current **`scripts/lib/service-pids.sh`**: with **`set -o pipefail`**, **`lsof`** exits non‑zero when nothing is listening on **11434** / **8443**, which used to abort **`start-stack.sh`** and **`status-stack.sh`** immediately. Refresh installed scripts (**`install-to-home.sh`** / **`deploy.sh`**) so **`~/.local/share/.../scripts/lib/service-pids.sh`** matches the repo.
 
 ---
 

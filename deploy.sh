@@ -126,16 +126,10 @@ cat >"$CADDYFILE" <<'EOF'
 {
 	admin off
 	auto_https off
-	servers {
-		read_timeout 15s
-		write_timeout 120s
-		idle_timeout 120s
-	}
 }
 
+# Plain HTTP on loopback — TLS terminates at the ngrok edge.
 127.0.0.1:8443 {
-	tls internal
-
 	request_body {
 		max_size 10MB
 	}
@@ -167,13 +161,13 @@ cat >"$CADDYFILE" <<'EOF'
 EOF
 
 cat >"$NGROK_CONFIG" <<EOF
+# NGROK_AUTHTOKEN comes from $ENV_FILE (exported by start-stack.sh); ngrok reads the env var — do not use literal \${...} here.
 version: "2"
-authtoken: \${NGROK_AUTHTOKEN}
 
 tunnels:
   cursor-ollama:
     proto: http
-    addr: https://127.0.0.1:8443
+    addr: http://127.0.0.1:8443
     inspect: false
 EOF
 
@@ -197,7 +191,7 @@ echo "  $CADDYFILE"
 echo "  $NGROK_CONFIG"
 echo
 echo "Commands on PATH:"
-echo "  cursor-ollama-gateway <start|stop|status|restart>"
+echo "  cursor-ollama-gateway <start|stop|status|restart|logs-clear>"
 echo "  cursor-ollama-start | cursor-ollama-stop | cursor-ollama-status  (shortcuts)"
 echo "  cursor-ollama-generate-secrets"
 echo
