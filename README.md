@@ -15,6 +15,8 @@ By default everything stays under your home directory so each user has an isolat
 | Config (`Caddyfile`, `ngrok.yml`, `.env`) | `${XDG_CONFIG_HOME:-$HOME/.config}/cursor-ollama-gateway/` |
 | PID files | `${XDG_STATE_HOME:-$HOME/.local/state}/cursor-ollama-gateway/run/` |
 | Logs (`start-stack.sh` **and** optional launchd) | `${XDG_DATA_HOME:-$HOME/.local/share}/cursor-ollama-gateway/logs/` |
+| Operator scripts (`paths.sh`, stack scripts, `generate-secrets`) | `${XDG_DATA_HOME:-$HOME/.local/share}/cursor-ollama-gateway/scripts/` |
+| PATH wrappers (quick deploy / `install-standard-layout`) | `~/.local/bin/` → `cursor-ollama-start`, `cursor-ollama-stop`, `cursor-ollama-status`, `cursor-ollama-generate-secrets` |
 
 Optional overrides:
 
@@ -42,7 +44,7 @@ We intentionally use **one `LOG_DIR`** for both interactive stack scripts and op
 - **Filenames**: `ollama.out.log`, `caddy-ollama.out.log`, `ngrok-ollama.out.log` (same as the stack script). Stderr is merged into the same file as stdout (`2>&1`).
 - **Do not double-run**: pick either launchd **or** `start-stack.sh` for a given component; two supervisors fighting the same ports will misbehave.
 
-For **`CURSOR_OLLAMA_GATEWAY_SYSTEM=1`**, logs default to `/usr/local/var/log/cursor-ollama-gateway/`; the bundled launchd templates target the user XDG layout—use stack scripts or customize plists if you run system-wide.
+For **`CURSOR_OLLAMA_GATEWAY_SYSTEM=1`**, logs default to `/usr/local/var/log/cursor-ollama-gateway/`; operator scripts install under `/usr/local/libexec/cursor-ollama-gateway/scripts/` and wrappers under `/usr/local/bin/`. The bundled launchd templates target the user XDG layout—customize plists if you run system-wide.
 
 ## Why this is secure
 
@@ -106,6 +108,22 @@ It prompts for:
 
 **Default output paths** (same as table above): config under `~/.config/cursor-ollama-gateway/`, plus run/log dirs under `~/.local/...`.
 
+It also **downloads** the same operator scripts as this repo into `~/.local/share/cursor-ollama-gateway/scripts/` (override with `SCRIPT_INSTALL`), installs **PATH wrappers** into `~/.local/bin/`, and **prepends `~/.local/bin` to your PATH** in `~/.zprofile`, `~/.zshrc`, or `~/.bash_profile` when needed (idempotent snippet). Open a new terminal afterward.
+
+Commands available globally:
+
+- `cursor-ollama-start`
+- `cursor-ollama-stop`
+- `cursor-ollama-status`
+- `cursor-ollama-generate-secrets`
+
+Use a different GitHub raw base (fork / branch) via:
+
+```bash
+export CURSOR_OLLAMA_GATEWAY_REPO_RAW="https://raw.githubusercontent.com/you/cursor-ollama-gateway/my-branch"
+bash <(curl -fsSL "${CURSOR_OLLAMA_GATEWAY_REPO_RAW}/deploy.sh")
+```
+
 For system-wide install instead:
 
 ```bash
@@ -143,7 +161,7 @@ CFG="${XDG_CONFIG_HOME:-$HOME/.config}/cursor-ollama-gateway"
 caddy validate --config "$CFG/Caddyfile"
 ```
 
-Scripts are intentionally **not** marked executable in git; invoke with `bash`:
+Scripts are intentionally **not** marked executable in git; invoke with `bash scripts/...`, or use **quick deploy** / **`install-standard-layout`** so copy-on-disk wrappers (`cursor-ollama-*`) exist under `~/.local/bin`.
 
 ## Startup scripts (no plist required)
 
@@ -151,18 +169,22 @@ Start:
 
 ```bash
 bash scripts/start-stack.sh
+# or, after quick deploy / install-standard-layout:
+cursor-ollama-start
 ```
 
 Status:
 
 ```bash
 bash scripts/status-stack.sh
+cursor-ollama-status
 ```
 
 Stop:
 
 ```bash
 bash scripts/stop-stack.sh
+cursor-ollama-stop
 ```
 
 PID files and process logs use `RUN_DIR` / `LOG_DIR` from `scripts/lib/paths.sh`.
@@ -213,8 +235,9 @@ curl -sS https://<your-ngrok-domain>/v1/models \
 
 ## Token rotation
 
-1. `ENV_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/cursor-ollama-gateway/.env" bash scripts/generate-secrets.sh`
-2. `bash scripts/stop-stack.sh && bash scripts/start-stack.sh`
+1. `cursor-ollama-generate-secrets`  
+   (or: `ENV_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/cursor-ollama-gateway/.env" bash scripts/generate-secrets.sh`)
+2. `cursor-ollama-stop && cursor-ollama-start` (or the equivalent `bash scripts/...` commands)
 3. Update Cursor API key.
 
 ## Incident response (token leak)

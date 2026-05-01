@@ -38,7 +38,44 @@ chmod 700 "$RUN_DIR"
 chmod 700 "$LOG_DIR"
 chmod 600 "$CONFIG_DIR/.env"
 
+if [[ "${CURSOR_OLLAMA_GATEWAY_SYSTEM:-}" == "1" ]]; then
+	SCRIPT_INSTALL="/usr/local/libexec/cursor-ollama-gateway/scripts"
+	WRAPPER_BIN="/usr/local/bin"
+	MAYBE_SUDO="sudo"
+else
+	SCRIPT_INSTALL="${XDG_DATA_HOME}/cursor-ollama-gateway/scripts"
+	WRAPPER_BIN="$HOME/.local/bin"
+	MAYBE_SUDO=""
+fi
+
+echo "Installing operator scripts to:"
+echo "  $SCRIPT_INSTALL"
+if [[ -n "$MAYBE_SUDO" ]]; then
+	sudo mkdir -p "$SCRIPT_INSTALL/lib"
+	sudo cp "$PROJECT_ROOT/scripts/lib/paths.sh" "$SCRIPT_INSTALL/lib/paths.sh"
+	sudo cp "$PROJECT_ROOT/scripts/lib/install-wrappers.sh" "$SCRIPT_INSTALL/lib/install-wrappers.sh"
+	for f in start-stack.sh stop-stack.sh status-stack.sh generate-secrets.sh; do
+		sudo cp "$PROJECT_ROOT/scripts/$f" "$SCRIPT_INSTALL/$f"
+	done
+	sudo chmod -R a+rX "$SCRIPT_INSTALL"
+else
+	mkdir -p "$SCRIPT_INSTALL/lib"
+	cp "$PROJECT_ROOT/scripts/lib/paths.sh" "$SCRIPT_INSTALL/lib/paths.sh"
+	cp "$PROJECT_ROOT/scripts/lib/install-wrappers.sh" "$SCRIPT_INSTALL/lib/install-wrappers.sh"
+	for f in start-stack.sh stop-stack.sh status-stack.sh generate-secrets.sh; do
+		cp "$PROJECT_ROOT/scripts/$f" "$SCRIPT_INSTALL/$f"
+	done
+	chmod -R a+rX "$SCRIPT_INSTALL"
+fi
+
+# shellcheck source=lib/install-wrappers.sh
+source "$SCRIPT_DIR/lib/install-wrappers.sh"
+install_cursor_ollama_gateway_wrappers "$SCRIPT_INSTALL" "$WRAPPER_BIN" "$MAYBE_SUDO"
+ensure_cursor_ollama_local_bin_on_path "$WRAPPER_BIN"
+
 echo "Install complete."
 echo "Next:"
 echo "  1) edit $CONFIG_DIR/.env"
-echo "  2) ENV_FILE=$CONFIG_DIR/.env ./scripts/generate-secrets.sh"
+echo "  2) cursor-ollama-generate-secrets"
+echo "     (or: ENV_FILE=$CONFIG_DIR/.env bash \"$SCRIPT_INSTALL/generate-secrets.sh\")"
+echo "  3) cursor-ollama-start"
