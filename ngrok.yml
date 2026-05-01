@@ -1,0 +1,8 @@
+version: "2"
+authtoken: ${NGROK_AUTHTOKEN}
+
+tunnels:
+  cursor-ollama:
+    proto: http
+    addr: https://127.0.0.1:8443
+    inspect: false

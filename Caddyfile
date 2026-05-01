@@ -1,0 +1,41 @@
+{
+	admin off
+	auto_https off
+	servers {
+		read_timeout 15s
+		write_timeout 120s
+		idle_timeout 120s
+	}
+}
+
+127.0.0.1:8443 {
+	tls internal
+
+	request_body {
+		max_size 10MB
+	}
+
+	@v1 path /v1/*
+	handle @v1 {
+		@missing_auth not header Authorization *
+		respond @missing_auth "missing authorization" 401
+
+		@bad_auth not header Authorization "Bearer {$OLLAMA_PROXY_TOKEN}"
+		respond @bad_auth "forbidden" 403
+
+		@bad_method not method GET POST
+		respond @bad_method "method not allowed" 405
+
+		header {
+			-Server
+			X-Content-Type-Options "nosniff"
+			X-Frame-Options "DENY"
+			Referrer-Policy "no-referrer"
+			Cache-Control "no-store"
+		}
+
+		reverse_proxy 127.0.0.1:11434
+	}
+
+	respond "not found" 404
+}

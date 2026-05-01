@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.cursor-ollama-gateway.caddy</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string>
+    <string>-lc</string>
+    <string>source /usr/local/etc/cursor-ollama-gateway/.env &amp;&amp; exec "$(command -v caddy)" run --config /usr/local/etc/cursor-ollama-gateway/Caddyfile</string>
+  </array>
+
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>WorkingDirectory</key>
+  <string>/usr/local/etc/cursor-ollama-gateway</string>
+
+  <key>StandardOutPath</key>
+  <string>/usr/local/var/log/cursor-ollama-gateway/caddy.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/usr/local/var/log/cursor-ollama-gateway/caddy.err.log</string>
+</dict>
+</plist>
