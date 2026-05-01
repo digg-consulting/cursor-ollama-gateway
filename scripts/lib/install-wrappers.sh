@@ -23,6 +23,26 @@ EOF
 	rm -f "$tmp"
 }
 
+_write_cursor_ollama_gateway_invoker() {
+	local maybe_sudo="$1"
+	local dest="$2"
+	local script_root="$3"
+	local subcommand="$4"
+	local tmp
+	tmp="$(mktemp)"
+	cat >"$tmp" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+exec bash "$script_root/cursor-ollama-gateway.sh" $subcommand "\$@"
+EOF
+	if [[ -n "$maybe_sudo" ]]; then
+		sudo install -m 0755 "$tmp" "$dest"
+	else
+		install -m 0755 "$tmp" "$dest"
+	fi
+	rm -f "$tmp"
+}
+
 install_cursor_ollama_gateway_wrappers() {
 	local script_root="$1"
 	local wrapper_bin="$2"
@@ -34,9 +54,10 @@ install_cursor_ollama_gateway_wrappers() {
 		mkdir -p "$wrapper_bin"
 	fi
 
-	_write_gateway_wrapper "$maybe_sudo" "$wrapper_bin/cursor-ollama-start" "$script_root/start-stack.sh"
-	_write_gateway_wrapper "$maybe_sudo" "$wrapper_bin/cursor-ollama-stop" "$script_root/stop-stack.sh"
-	_write_gateway_wrapper "$maybe_sudo" "$wrapper_bin/cursor-ollama-status" "$script_root/status-stack.sh"
+	_write_gateway_wrapper "$maybe_sudo" "$wrapper_bin/cursor-ollama-gateway" "$script_root/cursor-ollama-gateway.sh"
+	_write_cursor_ollama_gateway_invoker "$maybe_sudo" "$wrapper_bin/cursor-ollama-start" "$script_root" start
+	_write_cursor_ollama_gateway_invoker "$maybe_sudo" "$wrapper_bin/cursor-ollama-stop" "$script_root" stop
+	_write_cursor_ollama_gateway_invoker "$maybe_sudo" "$wrapper_bin/cursor-ollama-status" "$script_root" status
 	_write_gateway_wrapper "$maybe_sudo" "$wrapper_bin/cursor-ollama-generate-secrets" "$script_root/generate-secrets.sh"
 }
 

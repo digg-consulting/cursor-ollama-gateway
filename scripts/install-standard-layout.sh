@@ -54,6 +54,8 @@ if [[ -n "$MAYBE_SUDO" ]]; then
 	sudo mkdir -p "$SCRIPT_INSTALL/lib"
 	sudo cp "$PROJECT_ROOT/scripts/lib/paths.sh" "$SCRIPT_INSTALL/lib/paths.sh"
 	sudo cp "$PROJECT_ROOT/scripts/lib/install-wrappers.sh" "$SCRIPT_INSTALL/lib/install-wrappers.sh"
+	sudo cp "$PROJECT_ROOT/scripts/lib/service-pids.sh" "$SCRIPT_INSTALL/lib/service-pids.sh"
+	sudo cp "$PROJECT_ROOT/scripts/cursor-ollama-gateway.sh" "$SCRIPT_INSTALL/cursor-ollama-gateway.sh"
 	for f in start-stack.sh stop-stack.sh status-stack.sh generate-secrets.sh; do
 		sudo cp "$PROJECT_ROOT/scripts/$f" "$SCRIPT_INSTALL/$f"
 	done
@@ -62,6 +64,8 @@ else
 	mkdir -p "$SCRIPT_INSTALL/lib"
 	cp "$PROJECT_ROOT/scripts/lib/paths.sh" "$SCRIPT_INSTALL/lib/paths.sh"
 	cp "$PROJECT_ROOT/scripts/lib/install-wrappers.sh" "$SCRIPT_INSTALL/lib/install-wrappers.sh"
+	cp "$PROJECT_ROOT/scripts/lib/service-pids.sh" "$SCRIPT_INSTALL/lib/service-pids.sh"
+	cp "$PROJECT_ROOT/scripts/cursor-ollama-gateway.sh" "$SCRIPT_INSTALL/cursor-ollama-gateway.sh"
 	for f in start-stack.sh stop-stack.sh status-stack.sh generate-secrets.sh; do
 		cp "$PROJECT_ROOT/scripts/$f" "$SCRIPT_INSTALL/$f"
 	done
@@ -78,4 +82,4 @@ echo "Next:"
 echo "  1) edit $CONFIG_DIR/.env"
 echo "  2) cursor-ollama-generate-secrets"
 echo "     (or: ENV_FILE=$CONFIG_DIR/.env bash \"$SCRIPT_INSTALL/generate-secrets.sh\")"
-echo "  3) cursor-ollama-start"
+echo "  3) cursor-ollama-gateway start   (or: cursor-ollama-start)"

@@ -10,6 +10,8 @@ DEST="${XDG_DATA_HOME:-$HOME/.local/share}/cursor-ollama-gateway/scripts"
 mkdir -p "$DEST/lib"
 cp "$SCRIPT_DIR/lib/paths.sh" "$DEST/lib/paths.sh"
 cp "$SCRIPT_DIR/lib/install-wrappers.sh" "$DEST/lib/install-wrappers.sh"
+cp "$SCRIPT_DIR/lib/service-pids.sh" "$DEST/lib/service-pids.sh"
+cp "$SCRIPT_DIR/cursor-ollama-gateway.sh" "$DEST/cursor-ollama-gateway.sh"
 for f in start-stack.sh stop-stack.sh status-stack.sh generate-secrets.sh; do
 	cp "$SCRIPT_DIR/$f" "$DEST/$f"
 done
@@ -22,5 +24,5 @@ ensure_cursor_ollama_local_bin_on_path "$HOME/.local/bin"
 
 echo "Installed:"
 echo "  Scripts: $DEST"
-echo "  Wrappers: $HOME/.local/bin/cursor-ollama-{start,stop,status,generate-secrets}"
+echo "  Wrappers: $HOME/.local/bin/cursor-ollama-gateway, cursor-ollama-{start,stop,status}, cursor-ollama-generate-secrets"
 echo "Open a new terminal or: source ~/.zprofile (or the RC file named above)."

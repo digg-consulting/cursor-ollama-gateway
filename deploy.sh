@@ -68,9 +68,10 @@ fetch_operator_scripts() {
 
 	_fetch_raw_to_path "scripts/lib/paths.sh" "$SCRIPT_INSTALL/lib/paths.sh"
 	_fetch_raw_to_path "scripts/lib/install-wrappers.sh" "$SCRIPT_INSTALL/lib/install-wrappers.sh"
+	_fetch_raw_to_path "scripts/lib/service-pids.sh" "$SCRIPT_INSTALL/lib/service-pids.sh"
 
 	local f
-	for f in start-stack.sh stop-stack.sh status-stack.sh generate-secrets.sh; do
+	for f in cursor-ollama-gateway.sh start-stack.sh stop-stack.sh status-stack.sh generate-secrets.sh; do
 		_fetch_raw_to_path "scripts/$f" "$SCRIPT_INSTALL/$f"
 	done
 }
@@ -196,9 +197,8 @@ echo "  $CADDYFILE"
 echo "  $NGROK_CONFIG"
 echo
 echo "Commands on PATH:"
-echo "  cursor-ollama-start"
-echo "  cursor-ollama-stop"
-echo "  cursor-ollama-status"
+echo "  cursor-ollama-gateway <start|stop|status|restart>"
+echo "  cursor-ollama-start | cursor-ollama-stop | cursor-ollama-status  (shortcuts)"
 echo "  cursor-ollama-generate-secrets"
 echo
 echo "If your PATH was updated, open a new terminal or source the shell RC file mentioned above."

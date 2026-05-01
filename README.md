@@ -2,6 +2,8 @@
 
 Production-ready local gateway to connect Cursor to Ollama through ngrok, with Caddy enforcing auth and path restrictions.
 
+Having problems (invalid model name, auth, ngrok)? See **[TROUBLESHOOTING.md](./TROUBLESHOOTING.md)**.
+
 ## Architecture
 
 `Cursor -> ngrok (public HTTPS) -> Caddy (token auth + allowlist) -> Ollama (localhost only)`
@@ -16,7 +18,7 @@ By default everything stays under your home directory so each user has an isolat
 | PID files | `${XDG_STATE_HOME:-$HOME/.local/state}/cursor-ollama-gateway/run/` |
 | Logs (`start-stack.sh` **and** optional launchd) | `${XDG_DATA_HOME:-$HOME/.local/share}/cursor-ollama-gateway/logs/` |
 | Operator scripts (`paths.sh`, stack scripts, `generate-secrets`) | `${XDG_DATA_HOME:-$HOME/.local/share}/cursor-ollama-gateway/scripts/` |
-| PATH wrappers (quick deploy / `install-standard-layout`) | `~/.local/bin/` → `cursor-ollama-start`, `cursor-ollama-stop`, `cursor-ollama-status`, `cursor-ollama-generate-secrets` |
+| PATH wrappers (quick deploy / `install-standard-layout`) | `~/.local/bin/` → **`cursor-ollama-gateway`** (`start` \| `stop` \| `status` \| `restart`), shortcuts **`cursor-ollama-start`** / **`cursor-ollama-stop`** / **`cursor-ollama-status`**, plus **`cursor-ollama-generate-secrets`** |
 
 Optional overrides:
 
@@ -112,10 +114,9 @@ It also **downloads** the same operator scripts as this repo into `~/.local/shar
 
 Commands available globally:
 
-- `cursor-ollama-start`
-- `cursor-ollama-stop`
-- `cursor-ollama-status`
-- `cursor-ollama-generate-secrets`
+- **`cursor-ollama-gateway <start|stop|status|restart>`** — single entrypoint (like an init script); **`start`** refuses to run while **`brew services`** has **ollama** marked started unless **`CURSOR_OLLAMA_GATEWAY_ALLOW_BREW_OLLAMA=1`** (stop **`brew services stop ollama`** first so this stack owns **`ollama serve`**).
+- **`cursor-ollama-start`**, **`cursor-ollama-stop`**, **`cursor-ollama-status`** — thin wrappers that call **`cursor-ollama-gateway`** with the matching subcommand.
+- **`cursor-ollama-generate-secrets`**
 
 Use a different GitHub raw base (fork / branch) via:
 
@@ -171,26 +172,21 @@ Scripts are intentionally **not** marked executable in git; invoke with `bash sc
 
 ## Startup scripts (no plist required)
 
-Start:
+Preferred control path (runs **`brew services`** guard on **`start`**):
+
+```bash
+bash scripts/cursor-ollama-gateway.sh start   # stop | status | restart
+# or, after quick deploy / install-standard-layout:
+cursor-ollama-gateway start
+cursor-ollama-start    # same as: cursor-ollama-gateway start
+```
+
+Direct stack scripts (same processes; **`start`** skips the brew guard):
 
 ```bash
 bash scripts/start-stack.sh
-# or, after quick deploy / install-standard-layout:
-cursor-ollama-start
-```
-
-Status:
-
-```bash
 bash scripts/status-stack.sh
-cursor-ollama-status
-```
-
-Stop:
-
-```bash
 bash scripts/stop-stack.sh
-cursor-ollama-stop
 ```
 
 PID files and process logs use `RUN_DIR` / `LOG_DIR` from `scripts/lib/paths.sh`.
@@ -200,7 +196,7 @@ PID files and process logs use `RUN_DIR` / `LOG_DIR` from `scripts/lib/paths.sh`
 Add to your shell profile (adjust if you keep the repo elsewhere):
 
 ```bash
-bash /path/to/cursor-ollama-gateway/scripts/start-stack.sh >/dev/null 2>&1
+bash /path/to/cursor-ollama-gateway/scripts/cursor-ollama-gateway.sh start >/dev/null 2>&1
 ```
 
 ## Optional launchd
@@ -250,7 +246,7 @@ In Cursor, add an **OpenAI-compatible** (or **OpenAI API**) provider that talks 
 
 1. `cursor-ollama-generate-secrets`  
    (or: `ENV_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/cursor-ollama-gateway/.env" bash scripts/generate-secrets.sh`)
-2. `cursor-ollama-stop && cursor-ollama-start` (or the equivalent `bash scripts/...` commands)
+2. `cursor-ollama-gateway restart` (or `cursor-ollama-stop && cursor-ollama-start`, or `bash scripts/cursor-ollama-gateway.sh restart`)
 3. Update Cursor API key.
 
 ## Incident response (token leak)
