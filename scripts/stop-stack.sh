@@ -1,32 +1,34 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-RUN_DIR="${RUN_DIR:-/usr/local/var/run/cursor-ollama-gateway}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=lib/paths.sh
+source "$SCRIPT_DIR/lib/paths.sh"
 
 stop_proc() {
-  local name="$1"
-  local pid_file="$RUN_DIR/$name.pid"
+	local name="$1"
+	local pid_file="$RUN_DIR/$name.pid"
 
-  if [[ ! -f "$pid_file" ]]; then
-    echo "$name not running (no pid file)"
-    return
-  fi
+	if [[ ! -f "$pid_file" ]]; then
+		echo "$name not running (no pid file)"
+		return
+	fi
 
-  local pid
-  pid="$(cat "$pid_file")"
+	local pid
+	pid="$(cat "$pid_file")"
 
-  if kill -0 "$pid" 2>/dev/null; then
-    kill "$pid"
-    sleep 1
-    if kill -0 "$pid" 2>/dev/null; then
-      kill -9 "$pid" 2>/dev/null || true
-    fi
-    echo "stopped $name (pid $pid)"
-  else
-    echo "$name pid file existed but process not running"
-  fi
+	if kill -0 "$pid" 2>/dev/null; then
+		kill "$pid"
+		sleep 1
+		if kill -0 "$pid" 2>/dev/null; then
+			kill -9 "$pid" 2>/dev/null || true
+		fi
+		echo "stopped $name (pid $pid)"
+	else
+		echo "$name pid file existed but process not running"
+	fi
 
-  rm -f "$pid_file"
+	rm -f "$pid_file"
 }
 
 # stop in reverse dependency order

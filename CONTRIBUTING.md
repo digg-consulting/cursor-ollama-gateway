@@ -11,7 +11,12 @@ Thanks for contributing.
 
 ## Local Validation Checklist
 
-- `caddy validate --config /usr/local/etc/cursor-ollama-gateway/Caddyfile`
+After `./scripts/install-standard-layout.sh`, validate Caddy against your effective config path:
+
+```bash
+caddy validate --config "${XDG_CONFIG_HOME:-$HOME/.config}/cursor-ollama-gateway/Caddyfile"
+```
+
 - Verify `start-stack.sh`, `status-stack.sh`, and `stop-stack.sh` behavior.
 - Confirm no secrets are added to tracked files.
 

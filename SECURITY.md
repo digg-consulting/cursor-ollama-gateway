@@ -19,6 +19,7 @@ When reporting, include:
 ## Secrets and Hardening Notes
 
 - Never commit `.env` files or production tokens.
+- Default config lives under `~/.config/cursor-ollama-gateway/` (override with `XDG_CONFIG_HOME` or `CONFIG_DIR`). Treat that directory like secrets-adjacent storage.
 - Rotate `OLLAMA_PROXY_TOKEN` immediately if exposure is suspected.
 - Rotate `NGROK_AUTHTOKEN` immediately if exposure is suspected.
 - Keep Ollama bound to `127.0.0.1` only.

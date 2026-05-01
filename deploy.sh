@@ -1,37 +1,56 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-CONFIG_DIR="${CONFIG_DIR:-/usr/local/etc/cursor-ollama-gateway}"
-RUN_DIR="${RUN_DIR:-/usr/local/var/run/cursor-ollama-gateway}"
-LOG_DIR="${LOG_DIR:-/usr/local/var/log/cursor-ollama-gateway}"
+if [[ "${CURSOR_OLLAMA_GATEWAY_SYSTEM:-}" == "1" ]]; then
+	CONFIG_DIR="${CONFIG_DIR:-/usr/local/etc/cursor-ollama-gateway}"
+	RUN_DIR="${RUN_DIR:-/usr/local/var/run/cursor-ollama-gateway}"
+	LOG_DIR="${LOG_DIR:-/usr/local/var/log/cursor-ollama-gateway}"
+else
+	XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+	XDG_STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}"
+	XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
+	CONFIG_DIR="${CONFIG_DIR:-$XDG_CONFIG_HOME/cursor-ollama-gateway}"
+	RUN_DIR="${RUN_DIR:-$XDG_STATE_HOME/cursor-ollama-gateway/run}"
+	LOG_DIR="${LOG_DIR:-$XDG_DATA_HOME/cursor-ollama-gateway/logs}"
+fi
+
 ENV_FILE="$CONFIG_DIR/.env"
 CADDYFILE="$CONFIG_DIR/Caddyfile"
 NGROK_CONFIG="$CONFIG_DIR/ngrok.yml"
 
 require_cmd() {
-  if ! command -v "$1" >/dev/null 2>&1; then
-    echo "Missing required command: $1" >&2
-    exit 1
-  fi
+	if ! command -v "$1" >/dev/null 2>&1; then
+		echo "Missing required command: $1" >&2
+		exit 1
+	fi
 }
 
 prompt_required() {
-  local var_name="$1"
-  local prompt_text="$2"
-  local value=""
-  while [[ -z "$value" ]]; do
-    read -r -p "$prompt_text: " value
-  done
-  printf -v "$var_name" "%s" "$value"
+	local var_name="$1"
+	local prompt_text="$2"
+	local value=""
+	while [[ -z "$value" ]]; do
+		read -r -p "$prompt_text: " value
+	done
+	printf -v "$var_name" "%s" "$value"
 }
 
 echo "== Cursor Ollama Gateway Deploy =="
 echo "This script writes config under:"
 echo "  $CONFIG_DIR"
+echo "Runtime dirs:"
+echo "  run: $RUN_DIR"
+echo "  log: $LOG_DIR"
+if [[ "${CURSOR_OLLAMA_GATEWAY_SYSTEM:-}" == "1" ]]; then
+	echo "Mode: system (CURSOR_OLLAMA_GATEWAY_SYSTEM=1, uses sudo)"
+fi
 echo
 
-require_cmd sudo
 require_cmd openssl
+
+if [[ "${CURSOR_OLLAMA_GATEWAY_SYSTEM:-}" == "1" ]]; then
+	require_cmd sudo
+fi
 
 prompt_required NGROK_AUTHTOKEN "Enter NGROK_AUTHTOKEN"
 read -r -p "Enter reserved ngrok domain (optional, press enter to skip): " NGROK_DOMAIN
@@ -41,9 +60,13 @@ OLLAMA_HOST="${OLLAMA_HOST:-127.0.0.1:11434}"
 OLLAMA_PROXY_TOKEN="$(openssl rand -base64 72 | tr -d '\n' | tr '/+' '_-')"
 
 echo
-echo "Creating runtime directories..."
-sudo mkdir -p "$CONFIG_DIR" "$RUN_DIR" "$LOG_DIR"
-sudo chown -R "$USER":staff "$CONFIG_DIR" "$RUN_DIR" "$LOG_DIR"
+echo "Creating directories..."
+if [[ "${CURSOR_OLLAMA_GATEWAY_SYSTEM:-}" == "1" ]]; then
+	sudo mkdir -p "$CONFIG_DIR" "$RUN_DIR" "$LOG_DIR"
+	sudo chown -R "$USER":staff "$CONFIG_DIR" "$RUN_DIR" "$LOG_DIR"
+else
+	mkdir -p "$CONFIG_DIR" "$RUN_DIR" "$LOG_DIR"
+fi
 chmod 700 "$RUN_DIR" "$LOG_DIR"
 
 cat >"$ENV_FILE" <<EOF
@@ -109,7 +132,7 @@ tunnels:
 EOF
 
 if [[ -n "${NGROK_DOMAIN:-}" ]]; then
-  cat >>"$NGROK_CONFIG" <<EOF
+	cat >>"$NGROK_CONFIG" <<EOF
     domain: $NGROK_DOMAIN
 EOF
 fi
@@ -125,6 +148,8 @@ echo "  1) source $ENV_FILE"
 echo "  2) run ollama serve with OLLAMA_HOST=$OLLAMA_HOST"
 echo "  3) run: caddy run --config $CADDYFILE"
 echo "  4) run: ngrok start --config $NGROK_CONFIG cursor-ollama"
+echo
+echo "Or from a clone: ./scripts/start-stack.sh"
 echo
 echo "Use this token as Cursor API key:"
 echo "  $OLLAMA_PROXY_TOKEN"

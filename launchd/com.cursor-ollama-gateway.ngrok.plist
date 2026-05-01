@@ -9,20 +9,12 @@
   <array>
     <string>/bin/zsh</string>
     <string>-lc</string>
-    <string>source /usr/local/etc/cursor-ollama-gateway/.env &amp;&amp; exec "$(command -v ngrok)" start --config /usr/local/etc/cursor-ollama-gateway/ngrok.yml cursor-ollama</string>
+    <string>CFG="${XDG_CONFIG_HOME:-$HOME/.config}/cursor-ollama-gateway"; LOGROOT="${XDG_DATA_HOME:-$HOME/.local/share}/cursor-ollama-gateway/logs"; mkdir -p "$LOGROOT"; exec &gt;&gt;"$LOGROOT/ngrok-ollama.out.log" 2&gt;&amp;1; source "$CFG/.env" &amp;&amp; exec "$(command -v ngrok)" start --config "$CFG/ngrok.yml" cursor-ollama</string>
   </array>
 
   <key>RunAtLoad</key>
   <true/>
   <key>KeepAlive</key>
   <true/>
-
-  <key>WorkingDirectory</key>
-  <string>/usr/local/etc/cursor-ollama-gateway</string>
-
-  <key>StandardOutPath</key>
-  <string>/usr/local/var/log/cursor-ollama-gateway/ngrok.out.log</string>
-  <key>StandardErrorPath</key>
-  <string>/usr/local/var/log/cursor-ollama-gateway/ngrok.err.log</string>
 </dict>
 </plist>
