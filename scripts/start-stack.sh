@@ -76,7 +76,13 @@ start_proc() {
 
 	# bash -c inherits this script's exported env + PATH (from ~/.env via set -a).
 	# zsh -lc often diverges from non-login bash PATH and can miss Homebrew binaries.
-	nohup bash -c "$cmd" >>"$out_file" 2>>"$err_file" &
+	# Ngrok prints session status (including the public https URL) to stderr — keep it in *.out.log
+	# so print-ngrok-public-url.sh and log tailers see Forwarding lines in one place.
+	if [[ "$name" == "ngrok-ollama" ]]; then
+		nohup bash -c "$cmd" >>"$out_file" 2>&1 &
+	else
+		nohup bash -c "$cmd" >>"$out_file" 2>>"$err_file" &
+	fi
 	local launcher_pid=$!
 
 	sleep 1
@@ -101,10 +107,12 @@ start_proc() {
 	fi
 
 	echo "$launcher_pid" >"$pid_file"
-	echo "WARNING: $name exited immediately (launcher pid $launcher_pid). See $err_file" >&2
-	if [[ -s "$err_file" ]]; then
-		echo "Last lines from $(basename "$err_file"):" >&2
-		tail -n 20 "$err_file" | sed 's/^/  /' >&2
+	local diag="$err_file"
+	[[ "$name" == "ngrok-ollama" ]] && diag="$out_file"
+	echo "WARNING: $name exited immediately (launcher pid $launcher_pid). See $diag" >&2
+	if [[ -s "$diag" ]]; then
+		echo "Last lines from $(basename "$diag"):" >&2
+		tail -n 20 "$diag" | sed 's/^/  /' >&2
 	fi
 	return 0
 }
@@ -116,3 +124,9 @@ sleep 1
 start_proc "ngrok-ollama" 'exec "$(command -v ngrok)" start --config "'"$NGROK_CONFIG"'" cursor-ollama'
 
 echo "Stack start requested. Check status with: bash \"$SCRIPT_DIR/status-stack.sh\""
+echo
+if bash "$SCRIPT_DIR/print-ngrok-public-url.sh" --wait 2>/dev/null; then
+	:
+else
+	echo "(Tunnel URL will appear here once ngrok writes to $LOG_DIR/ngrok-ollama.out.log — run: cursor-ollama-gateway url)" >&2
+fi

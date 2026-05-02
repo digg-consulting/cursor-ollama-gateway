@@ -1,6 +1,6 @@
 # Cursor + Ollama Secure Gateway (macOS)
 
-Production-ready local gateway to connect Cursor to Ollama through ngrok, with Caddy enforcing auth and path restrictions.
+Production-ready local gateway: **Caddy** enforces bearer-token auth and path rules in front of **Ollama**. **Terminal tools** (`curl`, scripts) can use **`http://127.0.0.1:8443`** directly. **Cursor’s custom OpenAI-compatible provider does not:** Cursor validates base URLs server-side and returns **“Access to private networks is forbidden”** for **`localhost` / `127.0.0.1` / RFC1918** (SSRF protection). So **Cursor still needs a public HTTPS URL** into your gateway — typically **ngrok**, **[Cloudflare Quick Tunnels](https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/run-tunnel/trycloudflare/)**, Tailscale Funnel, etc. Ngrok remains optional only for non-Cursor clients that truly hit loopback.
 
 ## Documentation
 
@@ -13,7 +13,13 @@ Extra guides live under **[docs/](docs/)**. Highlights:
 
 ## Architecture
 
-`Cursor -> ngrok (public HTTPS) -> Caddy (token auth + allowlist) -> Ollama (localhost only)`
+**Local-only tools:** `curl/scripts -> http://127.0.0.1:8443 -> Caddy -> Ollama`
+
+**Cursor IDE (custom OpenAI-compatible URL):** requests are checked against Cursor’s servers, which **block private IPs** — use a **public HTTPS tunnel** into Caddy:
+
+`Cursor -> https://your-tunnel-host/… -> (tunnel agent on your Mac) -> Caddy -> Ollama`
+
+Ngrok is one tunnel option; Cloudflare **`cloudflared tunnel --url http://127.0.0.1:8443`**, Tailscale Funnel, etc. work conceptually the same (must terminate TLS at the edge with a **public** hostname).
 
 ## Where files live (default: per-user, XDG-style)
 
@@ -25,7 +31,7 @@ By default everything stays under your home directory so each user has an isolat
 | PID files | `${XDG_STATE_HOME:-$HOME/.local/state}/cursor-ollama-gateway/run/` |
 | Logs (`start-stack.sh` **and** optional launchd) | `${XDG_DATA_HOME:-$HOME/.local/share}/cursor-ollama-gateway/logs/` |
 | Operator scripts (`paths.sh`, stack scripts, `generate-secrets`) | `${XDG_DATA_HOME:-$HOME/.local/share}/cursor-ollama-gateway/scripts/` |
-| PATH wrappers (quick deploy / `install-standard-layout`) | `~/.local/bin/` → **`cursor-ollama-gateway`** (`start` \| `stop` \| `status` \| `restart` \| **`logs-clear`**), shortcuts **`cursor-ollama-start`** / **`cursor-ollama-stop`** / **`cursor-ollama-status`**, plus **`cursor-ollama-generate-secrets`** |
+| PATH wrappers (quick deploy / `install-standard-layout`) | `~/.local/bin/` → **`cursor-ollama-gateway`** (`start` \| `stop` \| `status` \| **`url`** \| `restart` \| **`logs-clear`**), shortcuts **`cursor-ollama-start`** / **`cursor-ollama-stop`** / **`cursor-ollama-status`**, plus **`cursor-ollama-generate-secrets`** |
 
 Optional overrides:
 
@@ -98,10 +104,24 @@ NGROK_AUTHTOKEN=YOUR_NGROK_AUTHTOKEN
 
 The **`ngrok.yml`** shipped with this project does **not** embed the token (ngrok reads **`NGROK_AUTHTOKEN`** from the environment after **`start-stack.sh`** sources **`.env`**). Never put a literal **`${NGROK_AUTHTOKEN}`** string in **`ngrok.yml`** — ngrok does not expand shell syntax and will fail with **ERR_NGROK_105**.
 
+**Free `ngrok-free.dev` URLs:** programmatic clients often need an extra request header (**`ngrok-skip-browser-warning`**) or you may see **`400`** / network errors from tools that can’t send it (see **[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)**).
+
 Optional but recommended for stable endpoint URLs:
 
 5. Reserve a domain/subdomain in ngrok dashboard.
 6. Set it in `ngrok.yml` under the tunnel as `domain: your-reserved-domain`.
+
+## Ngrok + Cursor (minimal checklist)
+
+This is the shortest path to a **working ngrok setup** with this gateway:
+
+1. **Templates** — Your config dir needs **`Caddyfile`**, **`ngrok.yml`**, and **`.env`** matching this repo (deploy script, **`install-standard-layout.sh`**, or copy by hand).
+2. **`.env`** — Set **`NGROK_AUTHTOKEN`** (real token string) and **`OLLAMA_PROXY_TOKEN`** (long secret used as Cursor’s API key). Do **not** add **`authtoken:`** to **`ngrok.yml`**.
+3. **Start** — `cursor-ollama-start` (or **`cursor-ollama-gateway start`**).
+4. **Public URL** — After ngrok connects, the start output prints **`Ngrok public URL`** and **`Cursor OpenAI Base URL`**. Any time later: **`cursor-ollama-gateway url`**.
+5. **Cursor** — OpenAI-compatible provider: **Base URL** = that value (ends with **`/v1`**), **API key** = **`OLLAMA_PROXY_TOKEN`**, **model** = an Ollama id from **`ollama list`** (e.g. **`llama3.1:8b`**).
+
+**Free `*.ngrok-free.*` URLs:** Ngrok may apply rules that expect **`ngrok-skip-browser-warning`** or a non-default **`User-Agent`**; Cursor usually cannot send those. If **`curl`** to **`127.0.0.1:8443`** works but Cursor fails through ngrok with **`400`** or empty responses, move to **paid ngrok** or another tunnel — see **[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)**.
 
 ## Quick Deploy (No Clone Required)
 
@@ -250,7 +270,7 @@ curl -sS https://<your-ngrok-domain>/v1/models \
 In Cursor, add an **OpenAI-compatible** (or **OpenAI API**) provider that talks to your gateway—not to OpenAI’s servers.
 
 - **Provider type:** OpenAI-compatible
-- **Base URL:** `https://<your-ngrok-domain>/v1`
+- **Base URL:** **`https://<your-public-tunnel-host>/v1`** (ngrok, **`*.trycloudflare.com`**, etc.). **Do not use `http://127.0.0.1` here** — Cursor will reject it (**private network forbidden**). Use **`http://127.0.0.1:8443`** only from your own terminal (`curl`, tests). If your tunnel strips **`POST`** bodies (seen with some free ngrok paths), try **`cloudflared`**, ngrok paid, or another tunnel — see **[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)**.
 - **API key:** paste the **`OLLAMA_PROXY_TOKEN`** value from your gateway `.env`  
   (typically `~/.config/cursor-ollama-gateway/.env`, or under `$XDG_CONFIG_HOME` if set).  
   Caddy checks this as the `Bearer` token; it is **only** your local gateway secret.

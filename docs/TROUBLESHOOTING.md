@@ -56,10 +56,72 @@ Library names change over time. If `qwen3:14b` is invalid for **your** install, 
 
 ---
 
+## Cursor: **“Access to private networks is forbidden”** (localhost / **127.0.0.1** base URL)
+
+Cursor does **not** let you use **`http://127.0.0.1`** or **`http://localhost`** as the OpenAI-compatible **override base URL**. Requests are validated in a way that **blocks RFC1918 / loopback** targets (**SSRF protection**).
+
+Use a **public HTTPS URL** from your tunnel (**ngrok**, **`cloudflared tunnel --url http://127.0.0.1:8443`**, Tailscale Funnel, …) ending in **`/v1`**, plus **`OLLAMA_PROXY_TOKEN`** as the API key. Keep testing the gateway with **`curl http://127.0.0.1:8443`** locally.
+
+---
+
 ## Connection errors / ngrok offline
+
+### **`ERR_NGROK_334`** — endpoint already online
+
+Ngrok says the public URL is **already bound** by another agent (another Terminal tab, older **`cursor-ollama-start`**, or a stray **`ngrok http`**).
+
+1. **`cursor-ollama-gateway stop`** (or **`cursor-ollama-stop`**).
+2. **`pgrep -fl ngrok`** — quit extra ngrok processes you do not want.
+3. **`cursor-ollama-gateway start`** again.
+
+**`cursor-ollama-gateway url`** reads **`ngrok-ollama.out.log`** and **`ngrok-ollama.err.log`**; if you still see **`334`**, the hostname in the error line is usually still the URL Cursor should use once only **one** tunnel owns it.
+
+---
 
 - Confirm ngrok is running and the URL in Cursor matches the current tunnel (URLs change unless you use a **reserved domain**).
 - From another machine or browser, try `GET https://<ngrok-domain>/v1/models` with the Bearer header (see above).
+
+### **`curl` returns `400`** on **`*.ngrok-free.dev`** / **`*.ngrok-free.app`**
+
+Ngrok’s **free** endpoints often intercept requests that don’t identify as your API client. Retry with:
+
+```bash
+curl -sS -i "https://<your-ngrok-host>/v1/models" \
+  -H "Authorization: Bearer $OLLAMA_PROXY_TOKEN" \
+  -H "ngrok-skip-browser-warning: 1"
+```
+
+If that returns **200** but plain **`curl` without that header returns 400**, **Cursor must send the same header**—many OpenAI-compatible clients don’t. Options: use **ngrok paid** (no warning behavior), put a tiny **local reverse proxy** in front that adds **`ngrok-skip-browser-warning`**, or check whether Cursor’s provider settings allow **custom HTTP headers**. Ngrok also documents using a **non-default User-Agent** as an alternative bypass on some plans—your **`curl -v`** response body usually states which rule triggered.
+
+### **Still `400` after `ngrok-skip-browser-warning`**
+
+Split **where** it fails:
+
+**A — Bypass ngrok (proves Caddy + token + Ollama)**
+
+```bash
+source "${XDG_CONFIG_HOME:-$HOME/.config}/cursor-ollama-gateway/.env"
+curl -sS -i --http1.1 "http://127.0.0.1:8443/v1/models" \
+  -H "Authorization: Bearer $OLLAMA_PROXY_TOKEN"
+```
+
+- **`401` / `403`** → wrong/missing **`OLLAMA_PROXY_TOKEN`** vs **`Caddyfile`** (not ngrok).
+- **`200`** → stack is fine locally; problem is **only** on the public URL.
+
+**B — Same URL ngrok uses, with headers ngrok expects**
+
+```bash
+curl -sS -i --http1.1 "https://YOUR-SUBDOMAIN.ngrok-free.dev/v1/models" \
+  -H "Authorization: Bearer $OLLAMA_PROXY_TOKEN" \
+  -H "ngrok-skip-browser-warning: 1" \
+  -H "User-Agent: Mozilla/5.0"
+```
+
+Read the **response body**: ngrok often returns HTML or JSON with an **`ERR_NGROK_*`** code explaining the **`400`**.
+
+**C — Tunnel **`host_header`**
+
+Current **[`ngrok.yml`](../ngrok.yml)** sets **`host_header: rewrite`** so the **`Host`** header matches **`127.0.0.1:8443`**. Merge that into **`~/.config/cursor-ollama-gateway/ngrok.yml`** and **`cursor-ollama-gateway restart`**.
 
 ---
 
@@ -90,6 +152,67 @@ cursor-ollama-gateway logs-clear
 ```
 
 Removes **`*.log`** (and **`*.log.*`**) directly under **`LOG_DIR`** (default **`~/.local/share/cursor-ollama-gateway/logs/`**). Stop or restart the stack first if you want a perfectly quiet startup log after clearing.
+
+---
+
+## **`Client sent an HTTP request to an HTTPS server`** (curl to **`http://127.0.0.1:8443`**)
+
+**Caddy enables automatic HTTPS for bare loopback addresses** like **`127.0.0.1:8443`** (self-signed), even when there is **no** **`tls internal`** line — so **`curl http://…`** speaks plain HTTP while Caddy expects TLS.
+
+**Fix:** use an explicit **`http://`** site address in **`Caddyfile`**:
+
+```caddyfile
+http://127.0.0.1:8443 {
+```
+
+Match **[`Caddyfile`](../Caddyfile)** from this repo, then **`caddy validate`**, **`cursor-ollama-gateway restart`**.
+
+If you previously used **`tls internal`**, remove it. **`curl https://127.0.0.1:8443`** against local TLS needs **`curl -k`** unless you trust Caddy’s CA — with **`http://`** in the site address you should use **`curl http://`** only.
+
+---
+
+## **`HTTP/1.0 400 Bad Request`** from **`http://127.0.0.1:8443/v1/models`**
+
+Older **`Caddyfile`** templates put **`request_body { max_size … }`** on the whole site. That makes **`reverse_proxy`** interact badly with **GET** requests (no body), often yielding **`400 Bad Request`**. Newer templates removed **site-wide** **`request_body`**; do not reintroduce **`request_body`** on **`/v1/*`** with **`reverse_proxy`** — see **chat completions empty body** below.
+
+---
+
+## **`/v1/chat/completions`** returns **`200`** with **`Content-Length: 0`** (Cursor: “Empty provider response”)
+
+Having **`request_body { max_size … }`** (even with **`@post`**) in the same **`handle`** as **`reverse_proxy`** to Ollama can **drop the POST body** so the upstream never runs a real completion; clients see an empty successful response.
+
+Current **[`Caddyfile`](../Caddyfile)** omits **`request_body`** on the proxy route. Sync **`~/.config/cursor-ollama-gateway/Caddyfile`**, **`caddy validate`**, **`cursor-ollama-gateway restart`**, then:
+
+```bash
+curl -sS -i "http://127.0.0.1:8443/v1/chat/completions" \
+  -H "Authorization: Bearer $OLLAMA_PROXY_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"llama3.1:8b","messages":[{"role":"user","content":"hi"}],"stream":false}'
+```
+
+You should see a **non-zero** JSON body with **`choices`**.
+
+### **`POST /v1/chat/completions`** works on **`127.0.0.1:8443`** but **`Content-Length: 0`** through **`https://….ngrok-free.dev`**
+
+Typical pattern: **`curl`** shows **`HTTP/2 200`** and **`server: Caddy`** but **no JSON body**. **`GET /v1/models`** through ngrok can still look fine — some clients only break on **`POST`**.
+
+**Try forcing HTTP/1.1 to the public URL:**
+
+```bash
+curl --http1.1 -sS -i "$BASE/v1/chat/completions" \
+  -H "Authorization: Bearer $OLLAMA_PROXY_TOKEN" \
+  -H "Content-Type: application/json" \
+  -H "ngrok-skip-browser-warning: 1" \
+  -d '{"model":"llama3.1:8b","messages":[{"role":"user","content":"hi"}],"stream":false}'
+```
+
+If **`--http1.1`** restores a JSON body, the failure is on the **HTTP/2 path between your client and ngrok’s edge** (Cursor may still use HTTP/2 and hit the same bug).
+
+**Practical mitigations:**
+
+1. **`brew upgrade ngrok`** (agent + edge behavior changes occasionally fix tunnel quirks).
+2. **Paid ngrok** (removes free-tier interstitial / header friction Cursor cannot easily send) or **Cloudflare Tunnel** / **Tailscale Funnel** if ngrok keeps mangling **`POST`** bodies or **`HTTP/2`**.
+3. Cursor **cannot** use **`http://127.0.0.1:8443/v1`** as the provider Base URL (**SSRF block**) — loopback is only for **`curl`** on your Mac.
 
 ---
 

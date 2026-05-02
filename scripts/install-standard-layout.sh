@@ -56,7 +56,7 @@ if [[ -n "$MAYBE_SUDO" ]]; then
 	sudo cp "$PROJECT_ROOT/scripts/lib/install-wrappers.sh" "$SCRIPT_INSTALL/lib/install-wrappers.sh"
 	sudo cp "$PROJECT_ROOT/scripts/lib/service-pids.sh" "$SCRIPT_INSTALL/lib/service-pids.sh"
 	sudo cp "$PROJECT_ROOT/scripts/cursor-ollama-gateway.sh" "$SCRIPT_INSTALL/cursor-ollama-gateway.sh"
-	for f in start-stack.sh stop-stack.sh status-stack.sh generate-secrets.sh; do
+	for f in start-stack.sh stop-stack.sh status-stack.sh generate-secrets.sh print-ngrok-public-url.sh; do
 		sudo cp "$PROJECT_ROOT/scripts/$f" "$SCRIPT_INSTALL/$f"
 	done
 	sudo chmod -R a+rX "$SCRIPT_INSTALL"
@@ -66,7 +66,7 @@ else
 	cp "$PROJECT_ROOT/scripts/lib/install-wrappers.sh" "$SCRIPT_INSTALL/lib/install-wrappers.sh"
 	cp "$PROJECT_ROOT/scripts/lib/service-pids.sh" "$SCRIPT_INSTALL/lib/service-pids.sh"
 	cp "$PROJECT_ROOT/scripts/cursor-ollama-gateway.sh" "$SCRIPT_INSTALL/cursor-ollama-gateway.sh"
-	for f in start-stack.sh stop-stack.sh status-stack.sh generate-secrets.sh; do
+	for f in start-stack.sh stop-stack.sh status-stack.sh generate-secrets.sh print-ngrok-public-url.sh; do
 		cp "$PROJECT_ROOT/scripts/$f" "$SCRIPT_INSTALL/$f"
 	done
 	chmod -R a+rX "$SCRIPT_INSTALL"

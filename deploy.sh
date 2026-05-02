@@ -71,7 +71,7 @@ fetch_operator_scripts() {
 	_fetch_raw_to_path "scripts/lib/service-pids.sh" "$SCRIPT_INSTALL/lib/service-pids.sh"
 
 	local f
-	for f in cursor-ollama-gateway.sh start-stack.sh stop-stack.sh status-stack.sh generate-secrets.sh; do
+	for f in cursor-ollama-gateway.sh start-stack.sh stop-stack.sh status-stack.sh generate-secrets.sh print-ngrok-public-url.sh; do
 		_fetch_raw_to_path "scripts/$f" "$SCRIPT_INSTALL/$f"
 	done
 }
@@ -128,12 +128,8 @@ cat >"$CADDYFILE" <<'EOF'
 	auto_https off
 }
 
-# Plain HTTP on loopback — TLS terminates at the ngrok edge.
-127.0.0.1:8443 {
-	request_body {
-		max_size 10MB
-	}
-
+# `http://` prefix required — bare 127.0.0.1:PORT triggers Caddy automatic HTTPS on loopback.
+http://127.0.0.1:8443 {
 	@v1 path /v1/*
 	handle @v1 {
 		@missing_auth not header Authorization *
@@ -168,6 +164,7 @@ tunnels:
   cursor-ollama:
     proto: http
     addr: http://127.0.0.1:8443
+    host_header: rewrite
     inspect: false
 EOF
 
@@ -191,9 +188,10 @@ echo "  $CADDYFILE"
 echo "  $NGROK_CONFIG"
 echo
 echo "Commands on PATH:"
-echo "  cursor-ollama-gateway <start|stop|status|restart|logs-clear>"
+echo "  cursor-ollama-gateway <start|stop|status|url|restart|logs-clear>"
 echo "  cursor-ollama-start | cursor-ollama-stop | cursor-ollama-status  (shortcuts)"
 echo "  cursor-ollama-generate-secrets"
+echo "After start: cursor-ollama-gateway url   (prints https tunnel → Cursor Base URL + /v1)"
 echo
 echo "If your PATH was updated, open a new terminal or source the shell RC file mentioned above."
 echo

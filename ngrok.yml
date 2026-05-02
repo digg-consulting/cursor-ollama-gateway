@@ -6,4 +6,6 @@ tunnels:
   cursor-ollama:
     proto: http
     addr: http://127.0.0.1:8443
+    # Rewrite Host to match the upstream URL — avoids some bad-gateway / odd responses when the edge sends another Host.
+    host_header: rewrite
     inspect: false

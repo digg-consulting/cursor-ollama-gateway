@@ -12,6 +12,7 @@ Commands:
   start       Start Ollama, Caddy, and ngrok (stack expects to own Ollama — stop brew services first).
   stop        Stop stack components and sweep listeners on known ports.
   status      Show listener / pid-file status.
+  url         Print the public https URL from ngrok logs (append /v1 for Cursor Base URL).
   restart     Run stop then start.
   logs-clear  Delete *.log under LOG_DIR (default: ~/.local/share/.../cursor-ollama-gateway/logs/).
 
@@ -78,6 +79,12 @@ status)
 	require_script status-stack.sh
 	gate_notify "status → status-stack.sh"
 	exec bash "$SCRIPT_DIR/status-stack.sh" "$@"
+	;;
+url)
+	shift
+	require_script print-ngrok-public-url.sh
+	gate_notify "url → print-ngrok-public-url.sh"
+	exec bash "$SCRIPT_DIR/print-ngrok-public-url.sh" "$@"
 	;;
 restart)
 	shift
