@@ -9,3 +9,6 @@ tunnels:
     # Rewrite Host to match the upstream URL — avoids some bad-gateway / odd responses when the edge sends another Host.
     host_header: rewrite
     inspect: false
+    # Optional — pin a stable URL (must exist under the SAME ngrok account as NGROK_AUTHTOKEN in .env).
+    # Free tier: reserve an *.ngrok-free.dev name in the dashboard, then uncomment one line:
+    # domain: your-name.ngrok-free.dev
