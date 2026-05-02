@@ -40,7 +40,16 @@ You should see a line **`qwen3:14b`** (or whatever you typed). If it is missing:
 
 In Cursor’s model dropdown / settings, use the **exact** id from `/v1/models` (e.g. `qwen3:14b`, not `Qwen3 14B` or a shortened name).
 
-### 4. Typos and naming
+### 4. **OpenAI API Key** disabled in Cursor (easy to miss)
+
+The provider panel often has an **API key** field **and** a separate control that **turns off** using that key (wording varies by Cursor version: disable OpenAI API Key, don’t use API key for requests, etc.). If sending the key is **off**:
+
+- Cursor may omit **`Authorization: Bearer …`** on **`GET /v1/models`** and chat calls.
+- **`curl`** from Terminal still works whenever you pass **`Bearer`** manually — so you can see **`200`** + **`qwen3:14b`** in **`/v1/models`** while Cursor reports **“AI Model Not Found”** / **“Model name is not valid”** or other vague failures.
+
+**Fix:** Settings → Models / your **OpenAI-compatible** provider → paste **`OLLAMA_PROXY_TOKEN`** in the API key field **and** ensure any **enable / use API key** toggle is **on**. Command Palette → **Developer: Reload Window**, then retry the model.
+
+### 5. Typos and naming
 
 Library names change over time. If `qwen3:14b` is invalid for **your** install, compare with:
 
@@ -51,7 +60,7 @@ Library names change over time. If `qwen3:14b` is invalid for **your** install, 
 
 ## HTTP 401 “missing authorization” or 403 “forbidden”
 
-- **401**: Cursor did not send `Authorization: Bearer ...`. Set the provider **API key** to **`OLLAMA_PROXY_TOKEN`** from your gateway `.env` (see main README).
+- **401**: Cursor did not send `Authorization: Bearer ...`. Set the provider **API key** to **`OLLAMA_PROXY_TOKEN`** from your gateway `.env` (see main README). If the field looks correct but nothing reaches Caddy with auth, see **step 4** under **Cursor: “AI Model Not Found”** above (**OpenAI API Key** / “use API key” toggle accidentally **disabled**).
 - **403**: Bearer token does not match what Caddy expects. Regenerate with `cursor-ollama-generate-secrets`, restart the stack, update Cursor’s API key.
 
 ---
