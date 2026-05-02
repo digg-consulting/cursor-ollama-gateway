@@ -9,12 +9,24 @@ source "$SCRIPT_DIR/lib/paths.sh"
 out_log="$LOG_DIR/ngrok-ollama.out.log"
 err_log="$LOG_DIR/ngrok-ollama.err.log"
 
-combined_ngrok_logs() {
+# Only scan recent lines — full logs accumulate URLs from older sessions (another laptop's domain,
+# stale ERR_NGROK_334 text, etc.) and `tail -1` on all https matches would lie about "current" URL.
+_recent_tail_lines() {
+	# shellcheck disable=SC2155
+	local n="${PRINT_NGROK_LOG_TAIL:-400}"
+	case "$n" in
+	'' | *[!0-9]*) n=400 ;;
+	esac
+	echo "$n"
+}
+
+combined_ngrok_logs_recent() {
+	local n
+	n="$(_recent_tail_lines)"
 	local f
 	for f in "$out_log" "$err_log"; do
 		[[ -f "$f" ]] || continue
-		[[ -s "$f" ]] || continue
-		cat "$f"
+		tail -n "$n" "$f" 2>/dev/null || true
 	done
 }
 
@@ -24,20 +36,20 @@ filter_tunnel_candidate() {
 }
 
 extract_from_forwarding_line() {
-	combined_ngrok_logs | grep -Fi forwarding | grep -oE 'https://[^[:space:]]+' | filter_tunnel_candidate | tail -1
+	combined_ngrok_logs_recent | grep -Fi forwarding | grep -oE 'https://[^[:space:]]+' | filter_tunnel_candidate | tail -1
 }
 
 # ERR_NGROK_334: "The endpoint 'https://….' is already online" — still gives the hostname Cursor needs.
 extract_from_endpoint_busy_message() {
-	combined_ngrok_logs | grep -oE "The endpoint 'https://[^']+'" | sed -e "s/^The endpoint '//" -e "s/'$//" | tail -1
+	combined_ngrok_logs_recent | grep -oE "The endpoint 'https://[^']+'" | sed -e "s/^The endpoint '//" -e "s/'$//" | tail -1
 }
 
 extract_fallback_last_https() {
-	combined_ngrok_logs | grep -oE 'https://[^[:space:]]+' | filter_tunnel_candidate | tail -1
+	combined_ngrok_logs_recent | grep -oE 'https://[^[:space:]]+' | filter_tunnel_candidate | tail -1
 }
 
 detect_ngrok_334() {
-	combined_ngrok_logs | grep -q 'ERR_NGROK_334' 2>/dev/null
+	combined_ngrok_logs_recent | grep -q 'ERR_NGROK_334' 2>/dev/null
 }
 
 wait_loop=0

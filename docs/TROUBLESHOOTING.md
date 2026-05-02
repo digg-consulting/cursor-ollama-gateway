@@ -66,6 +66,14 @@ Use a **public HTTPS URL** from your tunnel (**ngrok**, **`cloudflared tunnel --
 
 ## Connection errors / ngrok offline
 
+### **`cursor-ollama-gateway url`** shows another machine’s hostname
+
+The **`url`** command scans **`ngrok-ollama.{out,err}.log`**. Older releases read the **whole** file; the **last** `https://…` anywhere in that history could be a **stale** tunnel from another laptop or an old **`ERR_NGROK_334`** line — not what ngrok is using **now**.
+
+Current scripts only scan the **last ~400 lines** per log (override with **`PRINT_NGROK_LOG_TAIL`**). If it still looks wrong: **`cursor-ollama-gateway logs-clear`**, **`restart`**, then **`url`** again. Confirm **`NGROK_AUTHTOKEN`** and any **`domain:`** in **`ngrok.yml`** on **this** Mac match ngrok account 1 only.
+
+---
+
 ### **`ERR_NGROK_334`** — endpoint already online
 
 Ngrok says the public URL is **already bound** by another agent (another Terminal tab, older **`cursor-ollama-start`**, or a stray **`ngrok http`**).
