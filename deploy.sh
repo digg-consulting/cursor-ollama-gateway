@@ -193,6 +193,9 @@ echo "  cursor-ollama-start | cursor-ollama-stop | cursor-ollama-status  (shortc
 echo "  cursor-ollama-generate-secrets"
 echo "After start: cursor-ollama-gateway url   (prints https tunnel → Cursor Base URL + /v1)"
 echo
+echo "To refresh operator scripts to match latest GitHub main (keeps ~/.config/.../.env and ngrok.yml):"
+echo "  git -C /path/to/cursor-ollama-gateway pull && bash /path/to/cursor-ollama-gateway/scripts/install-to-home.sh"
+echo
 echo "If your PATH was updated, open a new terminal or source the shell RC file mentioned above."
 echo
 echo "Use this token as Cursor API key:"

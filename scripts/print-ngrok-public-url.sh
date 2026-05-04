@@ -15,10 +15,11 @@ pinned_https_url_from_ngrok_yml() {
 	local cfg="$NGROK_CONFIG"
 	[[ -f "$cfg" ]] || return 1
 	local raw host
-	raw="$(grep -E '^[[:space:]]*domain:[[:space:]]+[[:alnum:]._-]+' "$cfg" | tail -1)" || true
+	# Any `domain:` line that is not YAML-commented at column 0; value may be quoted or have trailing # comment.
+	raw="$(grep -E '^[[:space:]]*domain:' "$cfg" | tail -1)" || true
 	[[ -z "${raw:-}" ]] && return 1
 	host="${raw#*:}"
-	host="$(echo "$host" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' )"
+	host="$(printf '%s\n' "$host" | sed -e 's/#.*$//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")"
 	[[ -z "$host" ]] && return 1
 	case "$host" in
 	http://* | https://*) echo "${host%/}" ;;
