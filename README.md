@@ -141,6 +141,8 @@ It prompts for:
 
 It also **downloads** the same operator scripts as this repo into `~/.local/share/cursor-ollama-gateway/scripts/` (override with `SCRIPT_INSTALL`), installs **PATH wrappers** into `~/.local/bin/`, and **prepends `~/.local/bin` to your PATH** in `~/.zprofile`, `~/.zshrc`, or `~/.bash_profile` when needed (idempotent snippet). Open a new terminal afterward.
 
+**Operator scripts are not auto-updated:** Quick deploy copies those scripts from GitHub **`main` only while `deploy.sh` runs**. When **`main`** later adds fixes or features, your existing install under **`~/.local/share/.../scripts/`** stays on the old revision until you refresh it. To pull the latest scripts **without** touching **`~/.config/cursor-ollama-gateway/`** (your **`.env`**, **`ngrok.yml`**, **`Caddyfile`**), use a checkout of this repo at the revision you want and run **`bash scripts/install-to-home.sh`**—see **[Install from clone](#install-from-clone)**. Re-running **`deploy.sh`** also re-downloads scripts but repeats the full interactive flow (back up **`.env`** first if you customized it).
+
 Commands available globally:
 
 - **`cursor-ollama-gateway <start|stop|status|restart|logs-clear>`** — single entrypoint (like an init script); **`start`** refuses to run while **`brew services`** has **ollama** marked started unless **`CURSOR_OLLAMA_GATEWAY_ALLOW_BREW_OLLAMA=1`** (stop **`brew services stop ollama`** first so this stack owns **`ollama serve`**). **`logs-clear`** deletes **`*.log`** under **`LOG_DIR`** (see paths table).
